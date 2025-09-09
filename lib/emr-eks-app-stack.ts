@@ -3,7 +3,7 @@ import * as fs from 'fs';
 
 //import {readYamlFromDir} from '../utils/read-file';
 
-import { CfnInstanceProfile, ManagedPolicy, Policy, PolicyDocument, PolicyStatement, Role, ServicePrincipal } from 'aws-cdk-lib/aws-iam';
+import { CfnInstanceProfile, ManagedPolicy, Policy, PolicyDocument, PolicyStatement, Role, ServicePrincipal, Effect } from 'aws-cdk-lib/aws-iam';
 import { Secret } from 'aws-cdk-lib/aws-secretsmanager';
 import { InstanceClass, InstanceSize, InstanceType, Peer, Port, SecurityGroup, SubnetType, Vpc } from 'aws-cdk-lib/aws-ec2';
 import { AuroraMysqlEngineVersion, ClusterInstance, Credentials, DatabaseCluster, DatabaseClusterEngine } from 'aws-cdk-lib/aws-rds';
@@ -11,9 +11,11 @@ import { CapacityType, CfnAddon, Cluster, KubernetesVersion, NodegroupAmiType } 
 import { Bucket } from 'aws-cdk-lib/aws-s3';
 import * as IamPolicyEbsCsiDriver from './../k8s/iam-policy-ebs-csi-driver.json';
 import { KubectlV33Layer } from '@aws-cdk/lambda-layer-kubectl-v33';
+import * as eks from 'aws-cdk-lib/aws-eks';
 
 
 export class EmrEksAppStack extends cdk.Stack {
+  
   constructor(scope: cdk.App, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
@@ -21,6 +23,8 @@ export class EmrEksAppStack extends cdk.Stack {
       assumedBy: new ServicePrincipal('ec2.amazonaws.com'),
 
     });
+    
+    const clusterName = "emr-eks-workshop"
 
     const kubectl = new KubectlV33Layer(this, 'KubectlLayer');
 
@@ -82,7 +86,7 @@ export class EmrEksAppStack extends cdk.Stack {
       Port.tcp(3306),
       'allow MySQL access from vpc',
     );
-
+    
     const cluster = new DatabaseCluster(this, 'DatabaseV8', {
       engine: DatabaseClusterEngine.auroraMysql({ version: AuroraMysqlEngineVersion.VER_3_10_0 }),
       credentials: Credentials.fromSecret(databaseCredentialsSecret),
@@ -96,6 +100,24 @@ export class EmrEksAppStack extends cdk.Stack {
       vpc,
       securityGroups: [databaseSecurityGroup],
     });
+    
+    
+    const karpenterNodeRole = new Role(this, 'KarpenterNodeRole', {
+      roleName: `KarpenterNodeRole-${clusterName}`,
+      assumedBy: new ServicePrincipal('ec2.amazonaws.com'),
+      managedPolicies: [
+        ManagedPolicy.fromAwsManagedPolicyName('AmazonEKSWorkerNodePolicy'),
+        ManagedPolicy.fromAwsManagedPolicyName('AmazonEKS_CNI_Policy'),
+        ManagedPolicy.fromAwsManagedPolicyName('AmazonEC2ContainerRegistryReadOnly'),
+        ManagedPolicy.fromAwsManagedPolicyName('AmazonSSMManagedInstanceCore'),
+      ],
+    });
+
+    // Create instance profile for Karpenter nodes
+    const karpenterInstanceProfile = new CfnInstanceProfile(this, 'KarpenterInstanceProfile', {
+      instanceProfileName: 'KarpenterNodeInstanceProfile',
+      roles: [karpenterNodeRole.roleName],
+    });
 
     const eksCluster = new Cluster(this, "Cluster", {
       vpc: vpc,
@@ -104,10 +126,11 @@ export class EmrEksAppStack extends cdk.Stack {
       defaultCapacity: 0, // we want to manage capacity ourselves
       version: KubernetesVersion.V1_33,
       kubectlLayer: kubectl,
+      endpointAccess: eks.EndpointAccess.PUBLIC_AND_PRIVATE,
+      authenticationMode: eks.AuthenticationMode.API_AND_CONFIG_MAP,
     });
-
-    //let eksAuth = new AwsAuth(this, 'AwsAuth', {cluster: eksCluster});
-
+    
+    
     //eksAuth.addMastersRole(Role.fromRoleArn(this, 'admin', 'ROLE-ARN'));
 
     const ondemandNG = eksCluster.addNodegroupCapacity("ondemand-ng", {
@@ -138,6 +161,107 @@ export class EmrEksAppStack extends cdk.Stack {
 
     // Add EKS Fargate profile for EMR workloads
     eksCluster.addFargateProfile('fargate', { selectors: [{ namespace: 'eks-fargate' }] });
+    
+    
+    // Karpenter pre-requisite
+    const karpenterControllerPolicy = new ManagedPolicy(this, 'KarpenterControllerPolicy', {
+            managedPolicyName: `KarpenterControllerPolicy-${clusterName}`,
+            statements: [
+                new PolicyStatement({
+                    effect: Effect.ALLOW,
+                    actions: [
+                        'ssm:GetParameter',
+                        'ec2:DescribeImages',
+                        'ec2:RunInstances',
+                        'ec2:DescribeSubnets',
+                        'ec2:DescribeSecurityGroups',
+                        'ec2:DescribeLaunchTemplates',
+                        'ec2:DescribeInstances',
+                        'ec2:DescribeInstanceTypes',
+                        'ec2:DescribeInstanceTypeOfferings',
+                        'ec2:DescribeAvailabilityZones',
+                        'ec2:DeleteLaunchTemplate',
+                        'ec2:CreateTags',
+                        'ec2:CreateLaunchTemplate',
+                        'ec2:CreateFleet',
+                        'ec2:DescribeSpotPriceHistory',
+                        'pricing:GetProducts',
+                    ],
+                    resources: ['*'],
+                }),
+                new PolicyStatement({
+                    effect: Effect.ALLOW,
+                    actions: [
+                        'ec2:TerminateInstances',
+                        'ec2:DeleteLaunchTemplate',
+                    ],
+                    resources: ['*'],
+                    conditions: {
+                        StringEquals: {
+                            [`aws:ResourceTag/karpenter.sh/discovery`]: clusterName,
+                        },
+                    },
+                }),
+                new PolicyStatement({
+                    effect: Effect.ALLOW,
+                    actions: ['iam:PassRole'],
+                    resources: [karpenterNodeRole.roleArn],
+                }),
+                new PolicyStatement({
+                    effect: Effect.ALLOW,
+                    actions: ['eks:DescribeCluster'],
+                    resources: [eksCluster.clusterArn],
+                }),
+                new PolicyStatement({
+                    effect: Effect.ALLOW,
+                    actions: [
+                        'iam:GetInstanceProfile',
+                        'iam:CreateInstanceProfile',
+                        'iam:AddRoleToInstanceProfile',
+                        'iam:RemoveRoleFromInstanceProfile',
+                        'iam:DeleteInstanceProfile',
+                        'iam:TagInstanceProfile'
+                    ],
+                    resources: [`arn:aws:iam::${this.account}:instance-profile/*`],
+                }),
+            ],
+        });
+
+        // Create Karpenter IAM Role for Pod Identity
+    const karpenterPodRole = new Role(this, 'KarpenterPodRole', {
+            roleName: `${clusterName}-karpenter`,
+            assumedBy: new ServicePrincipal('pods.eks.amazonaws.com').withSessionTags(),
+            managedPolicies: [karpenterControllerPolicy],
+        });
+
+        // Add Access Entry for Karpenter Node Role
+    new eks.CfnAccessEntry(this, 'KarpenterNodeAccessEntry', {
+            clusterName: eksCluster.clusterName,
+            principalArn: karpenterNodeRole.roleArn,
+            type: 'EC2_LINUX'
+        });
+
+        // Install EKS Pod Identity Agent addon
+    const podIdentityAddon = new eks.CfnAddon(this, 'EksPodIdentityAgent', {
+            clusterName: eksCluster.clusterName,
+            addonName: 'eks-pod-identity-agent',
+            resolveConflicts: 'OVERWRITE',
+        });
+
+        // Ensure Pod Identity Association depends on the addon
+    const podIdentityAssociation = new eks.CfnPodIdentityAssociation(this, 'KarpenterPodIdentityAssociation', {
+            clusterName: eksCluster.clusterName,
+            namespace: "karpenter",
+            serviceAccount: 'karpenter',
+            roleArn: karpenterPodRole.roleArn,
+        });
+
+    podIdentityAssociation.addDependency(podIdentityAddon);
+
+        // Tag subnets for Karpenter discovery
+    vpc.privateSubnets.forEach((subnet: any) => {
+            cdk.Tags.of(subnet).add(`karpenter.sh/discovery`, clusterName);
+        });
 
     //Add EBS CSI DRIVER Service account
 

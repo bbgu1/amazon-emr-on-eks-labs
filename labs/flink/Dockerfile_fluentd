@@ -1,0 +1,4 @@
+FROM public.ecr.aws/emr-on-eks/fluentd/emr-7.0.0:latest
+USER root
+
+USER hadoop:hadoop
