@@ -1,13 +1,7 @@
-if [ $# -eq 0 ]
-  then
-    echo "Please provide EKSClusterName, Region and EKSClusterAdminArn from cloudformation outputs"
-    return
-fi
-
 #cloud9 comes with AWS v1. Upgrade to AWS v2
 sudo yum install jq -y
 
-aws configure set region $2
+#aws configure set region $2
 
 account_id=`aws sts get-caller-identity --query Account --output text`
 
@@ -23,7 +17,7 @@ eksctl version
 
 # Install kubectl on cloud9.
 
-curl -o kubectl https://amazon-eks.s3.us-west-2.amazonaws.com/1.18.8/2020-09-18/bin/linux/amd64/kubectl
+curl -O https://s3.us-west-2.amazonaws.com/amazon-eks/1.33.3/2025-08-03/bin/linux/amd64/kubectl
 chmod +x ./kubectl
 sudo mv ./kubectl /usr/local/bin
 
@@ -34,12 +28,19 @@ curl -sSL https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 
 # Copy TPC-DS data into account bucket
 #aws s3 cp --recursive s3://aws-data-analytics-workshops/emr-eks-workshop/data/ s3://emr-eks-workshop-$account_id/data/
 
-EXPORT CLUSTER_NAME=$1
-aws eks update-kubeconfig --name $1 --region $2
+export CLUSTER_NAME="emr-eks-workshop"
+TOKEN=`curl -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600"`
+export EKSCLUSTER_NAME="${CLUSTER_NAME:-emr-eks-workshop}"
+export ACCOUNTID="${ACCOUNTID:-$(aws sts get-caller-identity --query Account --output text)}"
+export AWS_REGION="${AWS_REGION:-$(curl -H "X-aws-ec2-metadata-token: $TOKEN" -s 169.254.169.254/latest/dynamic/instance-identity/document | jq -r '.region')}"
+echo "REGION: ${AWS_REGION}"
+echo "ACCOUNTID: ${ACCOUNTID}"
+aws configure set region $AWS_REGION
+aws eks update-kubeconfig --name $CLUSTER_NAME
 
 # Allow Cloud9 to talk to EKS Control Plane. Add Cloud9 IP address address inbound rule to EKS Cluster Security Group
 
-export EKS_SG=`aws eks describe-cluster --name $1 --query cluster.resourcesVpcConfig.clusterSecurityGroupId | sed 's/"//g'`
+export EKS_SG=`aws eks describe-cluster --name $CLUSTER_NAME --query cluster.resourcesVpcConfig.clusterSecurityGroupId | sed 's/"//g'`
 
 TOKEN=`curl -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600"`
 export C9_IP=$(curl -H "X-aws-ec2-metadata-token: $TOKEN" -s http://169.254.169.254/latest/meta-data/local-ipv4)

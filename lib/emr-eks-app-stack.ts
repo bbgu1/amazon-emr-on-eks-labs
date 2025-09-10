@@ -340,6 +340,11 @@ export class EmrEksAppStack extends cdk.Stack {
       value: EmrStudioUserRole.roleName,
       description: 'EmrStudio User Role Name'
     });
+    
+    new cdk.CfnOutput(this, 'DBCredentialSecret', {
+      value: databaseCredentialsSecret.secretName,
+      description: 'Secret Manager Secret Name for DB credential'
+    })
 
     new cdk.CfnOutput(this, 'EKSCluster', {
       value: eksCluster.clusterName,

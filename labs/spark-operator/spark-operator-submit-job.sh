@@ -1,6 +1,3 @@
-export S3BUCKET=$(aws cloudformation describe-stacks --stack-name EmrEksAppStack --query Stacks[0].Outputs | jq -c '.[] | select (.OutputKey | contains("S3Bucket"))' | jq .OutputValue | sed 's/"//g' | sed 's/s3:\/\///')
-
-read -p "Please enter the S3 bucket name provided in the CloudFormation output tab if it is not already provided here: [$S3BUCKET]: " S3BUCKET_NAME
 
 S3BUCKET_NAME=$S3BUCKET
 LOGPREFIX=logs/spark-operator/
@@ -28,7 +25,7 @@ spec:
   pythonVersion: "3"
   mode: cluster
   # EMR optimized runtime image
-  image: "public.ecr.aws/emr-on-eks/spark/emr-6.10.0:latest"
+  image: "public.ecr.aws/emr-on-eks/spark/emr-7.9.0:latest"
   imagePullPolicy: Always
   mainClass: ValueZones
   mainApplicationFile: s3://aws-data-analytics-workshops/emr-eks-workshop/scripts/pi.py
@@ -56,7 +53,7 @@ spec:
     spark.sql.emr.internal.extensions: com.amazonaws.emr.spark.EmrSparkSessionExtensions
     spark.executor.defaultJavaOptions: -verbose:gc -XX:+PrintGCDetails -XX:+PrintGCDateStamps -XX:+UseParallelGC -XX:InitiatingHeapOccupancyPercent=70 -XX:OnOutOfMemoryError='kill -9 %p'
     spark.driver.defaultJavaOptions:  -XX:OnOutOfMemoryError='kill -9 %p' -XX:+UseParallelGC -XX:InitiatingHeapOccupancyPercent=70
-  sparkVersion: "3.3.1"
+  sparkVersion: "3.5.5"
   restartPolicy:
     type: Never
   driver:
