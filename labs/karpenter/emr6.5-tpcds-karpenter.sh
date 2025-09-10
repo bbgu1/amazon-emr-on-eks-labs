@@ -9,13 +9,9 @@ export MEMORY="${MEMORY:-8}"
 export MEMORY_OVERHEAD=$(((${MEMORY}*25+(100-1))/100))
 export EXEC_MEMORY=$((${MEMORY}-${MEMORY_OVERHEAD}))
 
-export EKSCLUSTER_NAME="${EKSCLUSTER_NAME:-emr-eks-workshop}"
-export ACCOUNTID="${ACCOUNTID:-$(aws sts get-caller-identity --query Account --output text)}"
-export AWS_REGION="${AWS_REGION:-$(curl -s 169.254.169.254/latest/dynamic/instance-identity/document | jq -r '.region')}"
-export S3BUCKET="${S3BUCKET:-${EKSCLUSTER_NAME}-${ACCOUNTID}-${AWS_REGION}}"
 
-export VIRTUAL_CLUSTER_ID=$(aws emr-containers list-virtual-clusters --query "virtualClusters[?name == '${EKSCLUSTER_NAME}-karpenter' && state == 'RUNNING'].id" --output text)
-export EMR_ROLE_ARN=arn:aws:iam::$ACCOUNTID:role/$EKSCLUSTER_NAME-execution-role
+export VIRTUAL_CLUSTER_ID=$EMR_EKS_CLUSTER_ID
+export EMR_ROLE_ARN=$EMR_EKS_EXECUTION_ARN
 export ECR_URL="$ACCOUNTID.dkr.ecr.$AWS_REGION.amazonaws.com"
 
 aws emr-containers start-job-run \

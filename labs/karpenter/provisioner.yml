@@ -1,24 +1,24 @@
 ---
-apiVersion: karpenter.k8s.aws/v1beta1
+apiVersion: karpenter.k8s.aws/v1
 kind: EC2NodeClass
 metadata:
   name: default
 spec:
   # AMI family for EKS optimized AMIs
-  amiFamily: AL2023
+  amiSelectorTerms:
+    - alias: "al2023@{ALIAS_VERSION}"
   
-  # Subnet discovery using tags
   subnetSelectorTerms:
     - tags:
-        karpenter.sh/discovery: "emr-eks-workshop"
+        karpenter.sh/discovery: "{EKSCLUSTER_NAME}"
   
   # Security group discovery using tags  
   securityGroupSelectorTerms:
     - tags:
-        karpenter.sh/discovery: "emr-eks-workshop"
+        karpenter.sh/discovery: "{EKSCLUSTER_NAME}"
   
   # Instance profile for worker nodes
-  role: "KarpenterNodeInstanceProfile"
+  role: "KarpenterNodeRole-${EKSCLUSTER_NAME}"
     
   # Block device mappings
   blockDeviceMappings:
@@ -29,7 +29,7 @@ spec:
         deleteOnTermination: true
 
 ---
-apiVersion: karpenter.sh/v1beta1
+apiVersion: karpenter.sh/v1
 kind: NodePool
 metadata:
   name: default
@@ -62,7 +62,7 @@ spec:
           values: ["2xlarge", "4xlarge", "8xlarge", "9xlarge"]
         - key: "topology.kubernetes.io/zone"
           operator: In
-          values: ["us-west-2a"]
+          values: ["{AWS_REGION}a"]
       
       # Taints can be added here if needed
       # taints:
