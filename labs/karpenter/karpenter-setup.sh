@@ -10,6 +10,7 @@ S3BUCKET_NAME=${S3BUCKET_NAME:-$S3BUCKET}
 echo "Using S3 bucket: $S3BUCKET_NAME..."
 export EKS_VERSION="${EKS_VERSION:-1.33}"
 export KARPENTER_VERSION="1.6.3"
+export KARPENTER_NAMESPACE="karpenter"
 export ROLE_NAME=${EKSCLUSTER_NAME}-execution-role
 
 echo ""
@@ -67,22 +68,19 @@ echo "==============================================="
 # kubectl create namespace karpenter
 # create IAM role and launch template
 #CONTROLPLANE_SG=$(aws eks describe-cluster --name $EKSCLUSTER_NAME --region $AWS_REGION --query cluster.resourcesVpcConfig.clusterSecurityGroupId --output text)
-
+export ALIAS_VERSION="$(aws ssm get-parameter --name "/aws/service/eks/optimized-ami/${EKS_VERSION}/amazon-linux-2023/x86_64/standard/recommended/image_id" --query Parameter.Value | xargs aws ec2 describe-images --query 'Images[0].Name' --image-ids | sed -r 's/^.*(v[[:digit:]]+).*$/\1/')"
 # aws iam create-service-linked-role --aws-service-name spot.amazonaws.com || true
 #export KARPENTER_IAM_ROLE_ARN="arn:aws:iam::${ACCOUNTID}:role/${EKSCLUSTER_NAME}-karpenter"
 # Install Karpenter helm chart
-helm upgrade --install karpenter oci://public.ecr.aws/karpenter/karpenter --version ${KARPENTER_VERSION} --namespace karpenter --create-namespace \
-  --set clusterName=${EKSCLUSTER_NAME} \
-  --set "settings.interruptionQueue=${EKSCLUSTER_NAME}" \
-  --set controller.resources.requests.cpu=1 \
-  --set controller.resources.requests.memory=1Gi \
-  --set controller.resources.limits.cpu=1 \
-  --set controller.resources.limits.memory=1Gi \  --wait # for the defaulting webhook to install before creating a Provisioner
-
+helm upgrade --install karpenter oci://public.ecr.aws/karpenter/karpenter --version "${KARPENTER_VERSION}" --namespace "${KARPENTER_NAMESPACE}" --create-namespace \
+  --set "settings.clusterName=$EKSCLUSTER_NAME" \
+  --set "settings.interruptionQueue=${EKSCLUSTER_NAME}" 
+  
 #turn on debug mode
 
 sed -i -- 's/{AWS_REGION}/'$AWS_REGION'/g' provisioner.yml
 sed -i -- 's/{EKSCLUSTER_NAME}/'$EKSCLUSTER_NAME'/g' provisioner.yml
+sed -i -- 's/{ALIAS_VERSION}/'$ALIAS_VERSION'/g' provisioner.yml
 kubectl apply -f provisioner.yml
 
 

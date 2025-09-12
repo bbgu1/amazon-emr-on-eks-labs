@@ -29,7 +29,7 @@ aws emr-containers start-job-run \
       {
         "classification": "spark-defaults", 
         "properties": {
-          "spark.kubernetes.node.selector.app": "kspark",
+          "spark.kubernetes.node.selector.nodePool": "default",
           "spark.kubernetes.node.selector.topology.kubernetes.io/zone": "'${AWS_REGION}'a",
           "spark.kubernetes.container.image":  "'$ECR_URL'/eks-spark-benchmark:emr6.5",
           "spark.kubernetes.driver.podTemplateFile": "s3://'$S3BUCKET'/pod-template/karpenter-driver-pod-template.yaml",

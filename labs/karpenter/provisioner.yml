@@ -15,10 +15,10 @@ spec:
   # Security group discovery using tags  
   securityGroupSelectorTerms:
     - tags:
-        karpenter.sh/discovery: "{EKSCLUSTER_NAME}"
+        kubernetes.io/cluster/{EKSCLUSTER_NAME} : "owned"
   
   # Instance profile for worker nodes
-  role: "KarpenterNodeRole-${EKSCLUSTER_NAME}"
+  role: "KarpenterNodeRole-{EKSCLUSTER_NAME}"
     
   # Block device mappings
   blockDeviceMappings:
