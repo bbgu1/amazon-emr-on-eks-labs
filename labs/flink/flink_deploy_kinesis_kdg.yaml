@@ -22,7 +22,7 @@ spec:
   job:
     jarURI: s3://emr-eks-workshop-212097672561/scripts/flink_kinesis_kdg.py
     entryClass: "org.apache.flink.client.python.PythonDriver"
-    args: ["-py", "/opt/flink/usrlib/flink_kinesis_kdg.py", "--streamName", "flink-demo-stream"]
+    args: ["-py", "/opt/flink/usrlib/flink_kinesis_kdg.py", "--streamName", "flink-demo-stream", "--bucket", "emr-eks-workshop-212097672561"]
     parallelism: 2
     upgradeMode: stateless
   monitoringConfiguration:
