@@ -6,19 +6,19 @@ metadata:
 spec:
   # AMI family for EKS optimized AMIs
   amiSelectorTerms:
-    - alias: "al2023@{ALIAS_VERSION}"
+    - alias: "al2023@v20250904"
   
   subnetSelectorTerms:
     - tags:
-        karpenter.sh/discovery: "{EKSCLUSTER_NAME}"
+        karpenter.sh/discovery: "emr-eks-workshop"
   
   # Security group discovery using tags  
   securityGroupSelectorTerms:
     - tags:
-        kubernetes.io/cluster/{EKSCLUSTER_NAME} : "owned"
+        kubernetes.io/cluster/emr-eks-workshop : "owned"
   
   # Instance profile for worker nodes
-  role: "KarpenterNodeRole-{EKSCLUSTER_NAME}"
+  role: "KarpenterNodeRole-emr-eks-workshop"
     
   # Block device mappings
   blockDeviceMappings:
@@ -62,7 +62,7 @@ spec:
           values: ["2xlarge", "4xlarge", "8xlarge", "9xlarge"]
         - key: "topology.kubernetes.io/zone"
           operator: In
-          values: ["{AWS_REGION}a"]
+          values: ["us-east-1a"]
       
       # Taints can be added here if needed
       # taints:
