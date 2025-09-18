@@ -30,7 +30,13 @@
    RUN cp /tmp/emr-eks-flink-java/target/emr-eks-flink-java-1.0.9.jar $FLINK_HOME/userlib/emr-eks-flink-java-1.0.9.jar
 
    RUN wget https://repo1.maven.org/maven2/org/apache/flink/flink-parquet/${FLINK_VERSION}/flink-parquet-${FLINK_VERSION}.jar -O $FLINK_HOME/lib/flink-parquet-${FLINK_VERSION}.jar \
-    && wget https://repo1.maven.org/maven2/org/apache/flink/flink-sql-parquet/${FLINK_VERSION}/flink-sql-parquet-${FLINK_VERSION}.jar -O $FLINK_HOME/lib/flink-sql-parquet-$FLINK_VERSION.jar
+    && wget https://repo1.maven.org/maven2/org/apache/flink/flink-sql-parquet/${FLINK_VERSION}/flink-sql-parquet-${FLINK_VERSION}.jar -O $FLINK_HOME/lib/flink-sql-parquet-$FLINK_VERSION.jar \
+    && wget https://repo1.maven.org/maven2/org/apache/flink/flink-avro/${FLINK_VERSION}/flink-avro-${FLINK_VERSION}.jar -O $FLINK_HOME/lib/flink-avro-$FLINK_VERSION.jar \
+    && wget https://repo1.maven.org/maven2/org/apache/avro/avro/1.12.0/avro-1.12.0.jar -O $FLINK_HOME/lib/avro-1.12.0.jar \
+    && wget https://repo1.maven.org/maven2/com/fasterxml/jackson/core/jackson-core/2.20.0/jackson-core-2.20.0.jar -O $FLINK_HOME/lib/jackson-core-2.20.0.jar \
+    && wget https://repo1.maven.org/maven2/com/fasterxml/jackson/core/jackson-databind/2.20.0/jackson-databind-2.20.0.jar -O $FLINK_HOME/lib/jackson-databind-2.20.0.jar \
+    && wget https://repo1.maven.org/maven2/com/fasterxml/jackson/core/jackson-annotations/2.20/jackson-annotations-2.20.jar -O $FLINK_HOME/lib/jackson-annotations-2.20.jar
 
+   RUN rm -f /usr/lib/flink/lib/aws-java-sdk-bundle-1.*.jar
    # # Use hadoop user and group 
    USER hadoop:hadoop
